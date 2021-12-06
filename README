@@ -1,0 +1,93 @@
+About
+=====
+
+dis8080 is an Intel 8080 instruction disassembler. It reads machine
+code from standard input and writes the disassembly to standard
+output.
+
+
+Usage
+=====
+
+    dis8080 [-d ADDR COUNT]
+
+The option -d ADDR COUNT tells the disassembler to emit data
+definitions instead of instructions for COUNT bytes, starting at
+input offset ADDR. This option can be used multiple times.
+
+Output from dis8080 can be assembled with an assembler such as vasm
+or asmx.
+
+
+Build
+=====
+
+Compile dis8080 with an ANSI C compiler:
+
+    cc dis8080.c -o dis8080
+
+
+Examples
+========
+
+To disassemble the file example/add.bin, issue:
+
+    ./dis8080 < example/add.bin
+
+It generates the following output.
+
+-----------------------------------------------------
+                lxi     b,L0009
+                lxi     h,L000A
+                jmp     L000B
+        L0009:
+                mov     d,d
+        L000A:
+                call    L860A
+                ret
+
+        L000B   = $000B
+        L860A   = $860A
+
+        end
+-----------------------------------------------------
+
+This does not look quite right, because:
+* The two "lxi" instructions hint that the values at label L0009
+  and L000A should be interpreted as data rather than instructions.
+* "jmp" is unconditional so the "mov" will not be executed.
+* The "jmp" target is inside the "call" instruction.
+* "mov d,d" is not a commonly used instruction.
+
+What is happening here is that the disassembler does not know that
+following the "jmp" are two bytes of data, after which the program
+instruction stream continues at address $000B. In other words, the
+disassembler has become "out of phase". It is common to encounter
+cases like this in production code.
+
+To get a more realistic disassembly, mark the addresses $0009 and
+$000A as data with the -d option:
+
+    ./dis8080 < example/add.bin -d 0x0009 2
+
+-----------------------------------------------------
+                lxi     b,L0009
+                lxi     h,L000A
+                jmp     L000B
+        L0009:
+                db      $52             ; 'R'
+        L000A:
+                db      $cd
+        L000B:
+                ldax    b
+                add     m
+                ret
+
+
+        end
+-----------------------------------------------------
+
+Now this looks better as locations $0009 and $000A are interpreted
+as data rather than instructions. At label L000B the two data bytes
+in memory are added together.
+
